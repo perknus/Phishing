@@ -15,7 +15,7 @@ def send_request(url):
         response = requests.get(url)
         if response.status_code == 429:  # Too Many Requests
             print("Rate limit exceeded. Waiting for 30 seconds...")
-            time.sleep(30)  # 20秒待機
+            time.sleep(30)  # 30秒待機
         else:
             return response  # 成功したレスポンスを返すまたは他のステータスコード
     return None  # 3回試行しても成功しなかった場合
@@ -32,12 +32,12 @@ def query_eurid(domain, csv_writer):
         soup = BeautifulSoup(response.text, "html.parser")
         general_section = soup.find("section", id="section-general")
         registrant_section = soup.find("dl", id="registrant")
-        domain_name = status = registered_date = registrar = email = address = ""
+        status = registered_date = registrar = email = address = ""
 
         if general_section:
-            domain_name = general_section.find("dd").text.strip() if general_section.find("dd") else ""
             status_elements = general_section.find_all("dd")
-            status = status_elements[1].text.strip() if len(status_elements) > 1 else ""
+            status_text = status_elements[1].text.strip() if len(status_elements) > 1 else ""
+            status = status_text.split('\n')[0].strip() if status_text else ""
             registered_date = status_elements[2].text.strip() if len(status_elements) > 2 else ""
             registrar = status_elements[3].text.strip() if len(status_elements) > 3 else ""
 
@@ -52,8 +52,7 @@ def query_eurid(domain, csv_writer):
             if address_elements:
                 address = ", ".join([decrypt_xor(element["data-xor-text"], element["data-xor-key"]) for element in address_elements])
 
-        csv_writer.writerow([domain_name, status, registered_date, registrar, email, address])
-
+        csv_writer.writerow([domain, status, registered_date, registrar, email, address])
 
     elif response:
         print(f"Error with domain {domain}: {response.status_code}")
@@ -63,14 +62,16 @@ def query_eurid(domain, csv_writer):
         log_failed_domain(domain)
 
 if __name__ == "__main__":
-    with open("domain_info.csv", "a", newline='', encoding='utf-8') as csvfile:
+    lower_bound = int(input("Enter the lower bound: "))
+    upper_bound = int(input("Enter the upper bound: "))
+    output_file_name = f"{lower_bound}_{upper_bound}_domain_info.csv"
+
+    with open(output_file_name, "a", newline='', encoding='utf-8') as csvfile:
         csv_writer = csv.writer(csvfile)
-        lower_bound = int(input("Enter the lower bound: "))
-        upper_bound = int(input("Enter the upper bound: "))
         
         for i in range(lower_bound, upper_bound + 1):
             domain = f"id-{i}.eu"
             query_eurid(domain, csv_writer)
-            wait_time = random.randint(5, 20)  # 5から10秒の間でランダムに待機時間を決定
+            wait_time = random.randint(5, 20)  # 5から20秒の間でランダムに待機時間を決定
             print(f"Waiting for {wait_time} seconds...")
             time.sleep(wait_time)
